@@ -1,0 +1,4 @@
+C:/Users/magna/Documents/Projets/Vulkan_Learn/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/magna/Documents/Projets/Vulkan_Learn/build/CMakeFiles/ZERO_CHECK.dir
+C:/Users/magna/Documents/Projets/Vulkan_Learn/build/App/CMakeFiles/app.dir
+C:/Users/magna/Documents/Projets/Vulkan_Learn/build/App/CMakeFiles/copyShaders.dir

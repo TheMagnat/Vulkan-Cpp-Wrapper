@@ -1,0 +1,114 @@
+
+---
+events:
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.26/Modules/CMakeDetermineSystem.cmake:204 (message)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      The system is: Windows - 10.0.19044 - AMD64
+  -
+    kind: "message-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.26/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "C:/Program Files/CMake/share/cmake-3.26/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "C:/Program Files/CMake/share/cmake-3.26/Modules/CMakeDetermineCXXCompiler.cmake:126 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" succeeded.
+      Compiler:  
+      Build flags: 
+      Id flags:  
+      
+      The output was:
+      0
+      MSBuild version 17.4.1+9a89d02ff for .NET Framework
+      La génération a démarré 28/04/2023 20:12:05.
+      Projet "C:\\Users\\magna\\Documents\\Projets\\Vulkan_Learn\\build\\CMakeFiles\\3.26.0-rc5\\CompilerIdCXX\\CompilerIdCXX.vcxproj" sur le noud 1 (cibles par défaut).
+      PrepareForBuild:
+        Création du répertoire "Debug\\".
+        Création du répertoire "Debug\\CompilerIdCXX.tlog\\".
+      InitializeBuildStatus:
+        Création de "Debug\\CompilerIdCXX.tlog\\unsuccessfulbuild", car "AlwaysCreate" a été spécifié.
+      ClCompile:
+        D:\\Programmes\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.34.31933\\bin\\HostX64\\x64\\CL.exe /c /nologo /W0 /WX- /diagnostics:column /Od /D _MBCS /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"Debug\\\\" /Fd"Debug\\vc143.pdb" /external:W0 /Gd /TP /FC /errorReport:queue CMakeCXXCompilerId.cpp
+        CMakeCXXCompilerId.cpp
+      Link:
+        D:\\Programmes\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.34.31933\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:".\\CompilerIdCXX.exe" /INCREMENTAL:NO /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /PDB:".\\CompilerIdCXX.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:".\\CompilerIdCXX.lib" /MACHINE:X64 Debug\\CMakeCXXCompilerId.obj
+        CompilerIdCXX.vcxproj -> C:\\Users\\magna\\Documents\\Projets\\Vulkan_Learn\\build\\CMakeFiles\\3.26.0-rc5\\CompilerIdCXX\\CompilerIdCXX.exe
+      PostBuildEvent:
+        for %%i in (cl.exe) do @echo CMAKE_CXX_COMPILER=%%~$PATH:i
+        :VCEnd
+        CMAKE_CXX_COMPILER=D:\\Programmes\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.34.31933\\bin\\Hostx64\\x64\\cl.exe
+      FinalizeBuildStatus:
+        Suppression du fichier "Debug\\CompilerIdCXX.tlog\\unsuccessfulbuild".
+        Mise à jour de l'horodatage "Debug\\CompilerIdCXX.tlog\\CompilerIdCXX.lastbuildstate".
+      Génération du projet "C:\\Users\\magna\\Documents\\Projets\\Vulkan_Learn\\build\\CMakeFiles\\3.26.0-rc5\\CompilerIdCXX\\CompilerIdCXX.vcxproj" terminée (cibles par défaut).
+      
+      La génération a réussi.
+          0 Avertissement(s)
+          0 Erreur(s)
+      
+      Temps écoulé 00:00:03.25
+      
+      
+      Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "CompilerIdCXX.exe"
+      
+      Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "CompilerIdCXX.vcxproj"
+      
+      The CXX compiler identification is MSVC, found in:
+        C:/Users/magna/Documents/Projets/Vulkan_Learn/build/CMakeFiles/3.26.0-rc5/CompilerIdCXX/CompilerIdCXX.exe
+      
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.26/Modules/CMakeDetermineCompilerABI.cmake:57 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-3.26/Modules/CMakeTestCXXCompiler.cmake:26 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:3 (project)"
+    checks:
+      - "Detecting CXX compiler ABI info"
+    directories:
+      source: "C:/Users/magna/Documents/Projets/Vulkan_Learn/build/CMakeFiles/CMakeScratch/TryCompile-higrxe"
+      binary: "C:/Users/magna/Documents/Projets/Vulkan_Learn/build/CMakeFiles/CMakeScratch/TryCompile-higrxe"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
+      CMAKE_CXX_FLAGS_DEBUG: "/Ob0 /Od /RTC1"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+    buildResult:
+      variable: "CMAKE_CXX_ABI_COMPILED"
+      cached: true
+      stdout: |
+        Change Dir: C:/Users/magna/Documents/Projets/Vulkan_Learn/build/CMakeFiles/CMakeScratch/TryCompile-higrxe
+        
+        Run Build Command(s):D:/Programmes/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe cmTC_9862e.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n && MSBuild version 17.4.1+9a89d02ff for .NET Framework
+        La génération a démarré 28/04/2023 20:12:08.
+        Projet "C:\\Users\\magna\\Documents\\Projets\\Vulkan_Learn\\build\\CMakeFiles\\CMakeScratch\\TryCompile-higrxe\\cmTC_9862e.vcxproj" sur le noud 1 (cibles par défaut).
+        PrepareForBuild:
+          Création du répertoire "cmTC_9862e.dir\\Debug\\".
+          Création du répertoire "C:\\Users\\magna\\Documents\\Projets\\Vulkan_Learn\\build\\CMakeFiles\\CMakeScratch\\TryCompile-higrxe\\Debug\\".
+          Création du répertoire "cmTC_9862e.dir\\Debug\\cmTC_9862e.tlog\\".
+        InitializeBuildStatus:
+          Création de "cmTC_9862e.dir\\Debug\\cmTC_9862e.tlog\\unsuccessfulbuild", car "AlwaysCreate" a été spécifié.
+        ClCompile:
+          D:\\Programmes\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.34.31933\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_9862e.dir\\Debug\\\\" /Fd"cmTC_9862e.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-3.26\\Modules\\CMakeCXXCompilerABI.cpp"
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.34.31937 for x64
+          CMakeCXXCompilerABI.cpp
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /Gm- /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_9862e.dir\\Debug\\\\" /Fd"cmTC_9862e.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-3.26\\Modules\\CMakeCXXCompilerABI.cpp"
+        Link:
+          D:\\Programmes\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.34.31933\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\magna\\Documents\\Projets\\Vulkan_Learn\\build\\CMakeFiles\\CMakeScratch\\TryCompile-higrxe\\Debug\\cmTC_9862e.exe" /INCREMENTAL /ILK:"cmTC_9862e.dir\\Debug\\cmTC_9862e.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/magna/Documents/Projets/Vulkan_Learn/build/CMakeFiles/CMakeScratch/TryCompile-higrxe/Debug/cmTC_9862e.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/magna/Documents/Projets/Vulkan_Learn/build/CMakeFiles/CMakeScratch/TryCompile-higrxe/Debug/cmTC_9862e.lib" /MACHINE:X64  /machine:x64 cmTC_9862e.dir\\Debug\\CMakeCXXCompilerABI.obj
+          cmTC_9862e.vcxproj -> C:\\Users\\magna\\Documents\\Projets\\Vulkan_Learn\\build\\CMakeFiles\\CMakeScratch\\TryCompile-higrxe\\Debug\\cmTC_9862e.exe
+        FinalizeBuildStatus:
+          Suppression du fichier "cmTC_9862e.dir\\Debug\\cmTC_9862e.tlog\\unsuccessfulbuild".
+          Mise à jour de l'horodatage "cmTC_9862e.dir\\Debug\\cmTC_9862e.tlog\\cmTC_9862e.lastbuildstate".
+        Génération du projet "C:\\Users\\magna\\Documents\\Projets\\Vulkan_Learn\\build\\CMakeFiles\\CMakeScratch\\TryCompile-higrxe\\cmTC_9862e.vcxproj" terminée (cibles par défaut).
+        
+        La génération a réussi.
+            0 Avertissement(s)
+            0 Erreur(s)
+        
+        Temps écoulé 00:00:00.84
+        
+      exitCode: 0
+...

@@ -1,0 +1,30 @@
+^C:\USERS\MAGNA\DOCUMENTS\PROJETS\VULKAN_LEARN\BUILD\CMAKEFILES\B728F6AF6C2EC759D0E45C964DB912CF\MAIN.FRAG.SPV.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/magna/Documents/Projets/Vulkan_Learn/resources/Shaders/main.frag.spv C:/Users/magna/Documents/Projets/Vulkan_Learn/build/App/Release/Shaders/main.frag.spv
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\CMake\bin\cmake.exe" -E copy_if_different C:/Users/magna/Documents/Projets/Vulkan_Learn/resources/Shaders/main.vert.spv C:/Users/magna/Documents/Projets/Vulkan_Learn/build/App/Release/Shaders/main.vert.spv
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\MAGNA\DOCUMENTS\PROJETS\VULKAN_LEARN\BUILD\CMAKEFILES\14A6AD7C739A53231E72C54EA35E3BBB\COPYSHADERS.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\MAGNA\DOCUMENTS\PROJETS\VULKAN_LEARN\APP\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/magna/Documents/Projets/Vulkan_Learn -BC:/Users/magna/Documents/Projets/Vulkan_Learn/build --check-stamp-file C:/Users/magna/Documents/Projets/Vulkan_Learn/build/App/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
