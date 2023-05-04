@@ -5,7 +5,7 @@
 
 #include <VulkanObjects/Helper/QueueFamily.hpp>
 #include <VulkanObjects/Helper/Checker.hpp>
-#include <VulkanObjects/Helper/SwapChain.hpp>
+#include <VulkanObjects/Helper/SwapChainHelper.hpp>
 
 #include <VulkanObjects/Configuration.hpp>
 
@@ -79,7 +79,7 @@ class PhysicalDevices {
             bool extensionsSupported = Checker::deviceExtensionSupport(device);
             bool swapChainAdequate = false;
             if (extensionsSupported) {
-                SwapChain::SwapChainSupportDetails swapChainSupport = SwapChain::querySwapChainSupport(device, surface);
+                SwapChainHelper::SwapChainSupportDetails swapChainSupport = SwapChainHelper::querySwapChainSupport(device, surface);
                 swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
             }
             

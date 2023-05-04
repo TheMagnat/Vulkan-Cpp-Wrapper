@@ -7,7 +7,7 @@
 #include <algorithm>
 
 
-class SwapChain {
+class SwapChainHelper {
 
     public:
 

@@ -63,13 +63,13 @@ class Checker {
 
         }
 
-        static bool deviceExtensionSupport(VkPhysicalDevice device) {
+        static bool deviceExtensionSupport(VkPhysicalDevice physicalDevice) {
             
             uint32_t extensionCount;
-            vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+            vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr);
 
             std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-            vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+            vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, availableExtensions.data());
 
             std::vector<const char*> availableStringVector;
             for ( VkExtensionProperties const& extension : availableExtensions )

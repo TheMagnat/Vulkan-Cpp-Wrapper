@@ -3,6 +3,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <VulkanObjects/Allocator.hpp>
 #include <VulkanObjects/Helper/Command.hpp>
 
 #include <stdexcept>
@@ -12,75 +13,96 @@ class Buffer {
 
     public:
 
-        static void createImage(VkDevice device, VkPhysicalDevice physicalDevice, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
+        static void createImage(VmaAllocator allocator, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VmaAllocationCreateFlags flags, VkImage& image, VmaAllocation& imageAllocation) {
             
-            VkImageCreateInfo imageInfo{};
-            imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-            imageInfo.imageType = VK_IMAGE_TYPE_2D;
-            imageInfo.extent.width = width;
-            imageInfo.extent.height = height;
-            imageInfo.extent.depth = 1;
-            imageInfo.mipLevels = 1;
-            imageInfo.arrayLayers = 1;
+            VkImageCreateInfo imageCreateInfo{};
+            imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+            imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageCreateInfo.extent.width = width;
+            imageCreateInfo.extent.height = height;
+            imageCreateInfo.extent.depth = 1;
+            imageCreateInfo.mipLevels = 1;
+            imageCreateInfo.arrayLayers = 1;
 
-            imageInfo.format = format;
+            imageCreateInfo.format = format;
 
             //TODO: voir l'impact de changer ça pour "VK_IMAGE_TILING_LINEAR" 
-            imageInfo.tiling = tiling;
+            imageCreateInfo.tiling = tiling;
 
-            imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             
-            imageInfo.usage = usage;
+            imageCreateInfo.usage = usage;
 
-            imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-            imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-            imageInfo.flags = 0; // Optional
+            imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+            imageCreateInfo.flags = 0; // Optional
 
-            if (vkCreateImage(device, &imageInfo, nullptr, &image) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to create image !");
-            }
+            // if (vkCreateImage(device, &imageCreateInfo, nullptr, &image) != VK_SUCCESS) {
+            //     throw std::runtime_error("Failed to create image !");
+            // }
 
-            VkMemoryRequirements memRequirements;
-            vkGetImageMemoryRequirements(device, image, &memRequirements);
+            VmaAllocationCreateInfo allocCreateInfo = {};
+            allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+            allocCreateInfo.flags = flags;
+            allocCreateInfo.priority = 1.0f;
+            
+            vmaCreateImage(allocator, &imageCreateInfo, &allocCreateInfo, &image, &imageAllocation, nullptr);
 
-            VkMemoryAllocateInfo allocInfo{};
-            allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-            allocInfo.allocationSize = memRequirements.size;
-            allocInfo.memoryTypeIndex = Buffer::findMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties);
+            // VkMemoryRequirements memRequirements;
+            // vkGetImageMemoryRequirements(device, image, &memRequirements);
 
-            if (vkAllocateMemory(device, &allocInfo, nullptr, & imageMemory) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to allocate memory for the image !");
-            }
+            // VkMemoryAllocateInfo allocInfo{};
+            // allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            // allocInfo.allocationSize = memRequirements.size;
+            // allocInfo.memoryTypeIndex = Buffer::findMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties);
 
-            vkBindImageMemory(device, image,  imageMemory, 0);
+            // if (vkAllocateMemory(device, &allocInfo, nullptr, & imageMemory) != VK_SUCCESS) {
+            //     throw std::runtime_error("Failed to allocate memory for the image !");
+            // }
+
+            // vkBindImageMemory(device, image,  imageMemory, 0);
 
         }
 
-        static void create(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
-            VkBufferCreateInfo bufferInfo{};
-            bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            bufferInfo.size = size;
-            bufferInfo.usage = usage;
-            bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        static void create(VmaAllocator allocator, VkDeviceSize size, VkBufferUsageFlags usage, VmaAllocationCreateFlags flags, VkBuffer& buffer, VmaAllocation& bufferAllocation, VmaAllocationInfo* bufferAllocInfo) {
+            VkBufferCreateInfo bufCreateInfo{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+            bufCreateInfo.size = size;
+            bufCreateInfo.usage = usage;
+            bufCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            
+            VmaAllocationCreateInfo allocCreateInfo = {};
+            allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+            allocCreateInfo.flags = flags;
+            
+            //VkBuffer buf;
+            //VmaAllocation alloc;
+            //VmaAllocationInfo allocInfo;
+            VmaTotalStatistics stats;
+            vmaCalculateStatistics (allocator, &stats);
 
-            if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to create a buffer !");
-            }
+            vmaCreateBuffer(allocator, &bufCreateInfo, &allocCreateInfo, &buffer, &bufferAllocation, bufferAllocInfo);
 
-            VkMemoryRequirements memRequirements;
-            vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
 
-            VkMemoryAllocateInfo allocInfo{};
-            allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-            allocInfo.allocationSize = memRequirements.size;
-            allocInfo.memoryTypeIndex = Buffer::findMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties);
+            vmaCalculateStatistics (allocator, &stats);
 
-            if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to allocate memory !");
-            }
+            // if (vkCreateBuffer(device, &bufCreateInfo, nullptr, &buffer) != VK_SUCCESS) {
+            //     throw std::runtime_error("Failed to create a buffer !");
+            // }
 
-            vkBindBufferMemory(device, buffer, bufferMemory, 0);
+            // VkMemoryRequirements memRequirements;
+            // vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+            // VkMemoryAllocateInfo allocInfo{};
+            // allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            // allocInfo.allocationSize = memRequirements.size;
+            // allocInfo.memoryTypeIndex = Buffer::findMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties);
+
+            // if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+            //     throw std::runtime_error("Failed to allocate memory !");
+            // }
+
+            // vkBindBufferMemory(device, buffer, bufferMemory, 0);
         }
 
         static uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {

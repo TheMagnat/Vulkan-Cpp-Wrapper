@@ -3,11 +3,15 @@
 
 #include <vulkan/vulkan.h>
 
+#include <VulkanObjects/Device.hpp>
+#include <VulkanObjects/Allocator.hpp>
 #include <VulkanObjects/Texture.hpp>
 
 #include <VulkanObjects/Helper/Buffer.hpp>
 
+#include <optional>
 #include <vector>
+#include <array>
 
 struct UniformInformations {
     uint32_t binding;
@@ -15,29 +19,35 @@ struct UniformInformations {
     VkShaderStageFlags flags;
 };
 
+struct PushConstantInformations {
+    VkDeviceSize bufferSize;
+    VkShaderStageFlags flags;
+};
+
 struct UniformBufferWrapper {
 
     UniformBufferWrapper(uint16_t nbFrames, UniformInformations const& uniformInformationP)
-        : informations(uniformInformationP), uniformBuffers(nbFrames), uniformBuffersMemory(nbFrames), uniformBuffersMapped(nbFrames) {}
+        : informations(uniformInformationP), uniformBuffers(nbFrames), uniformBuffersAllocation(nbFrames), uniformBuffersMapped(nbFrames) {}
 
-    void allocate(VkDevice device, VkPhysicalDevice physicalDevice) {
+    void allocate(VmaAllocator allocator, VkPhysicalDevice physicalDevice) {
 
         for (size_t i = 0; i < uniformBuffers.size(); i++) {
-			Buffer::create(device, physicalDevice, informations.bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
+            VmaAllocationInfo allocationInfo;
+            //TODO: pas sur pour les flags
+			Buffer::create(allocator, informations.bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT, uniformBuffers[i], uniformBuffersAllocation[i], &allocationInfo);
 
-			vkMapMemory(device, uniformBuffersMemory[i], 0, informations.bufferSize, 0, &uniformBuffersMapped[i]);
+            uniformBuffersMapped[i] = allocationInfo.pMappedData;
 		}
 
         allocated_ = true;
 
     }
 
-    void deallocate(VkDevice device) {
+    void deallocate(VmaAllocator allocator) {
         if (allocated_) {
 
             for (size_t i = 0; i < uniformBuffers.size(); i++) {
-                vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-                vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+                vmaDestroyBuffer(allocator, uniformBuffers[i], uniformBuffersAllocation[i]);
             }
 
             allocated_ = false;
@@ -48,7 +58,7 @@ struct UniformBufferWrapper {
 
     //Uniforms memory (Vulkan objects)
     std::vector<VkBuffer> uniformBuffers;
-    std::vector<VkDeviceMemory> uniformBuffersMemory;
+    std::vector<VmaAllocation> uniformBuffersAllocation;
     std::vector<void*> uniformBuffersMapped;
 
     bool allocated_ = false;
@@ -58,36 +68,48 @@ struct UniformBufferWrapper {
 class Shader {
 
     public:
-        Shader(VkDevice device, VkPhysicalDevice physicalDevice, uint16_t nbFrames)
-            : device_(device), physicalDevice_(physicalDevice), nbFrames_(nbFrames) {
-
-        }
+        Shader(const Device* device, uint16_t nbFrames, const std::string& vertexFilename, const std::string& fragmentFilename)
+            : device_(device), nbFrames_(nbFrames), vertexFilename_(vertexFilename), fragmentFilename_(fragmentFilename) {}
 
         ~Shader() {
             
             for (UniformBufferWrapper& uniformBufferWrapper : uniformBufferWrappers_)
-                uniformBufferWrapper.deallocate(device_);
+                uniformBufferWrapper.deallocate(device_->getAllocator());
 
             if(descriptorPool_){
-                vkDestroyDescriptorPool(device_, descriptorPool_, nullptr);
+                vkDestroyDescriptorPool(device_->get(), descriptorPool_, nullptr);
                 descriptorPool_ = nullptr;
             }
 
             if(descriptorSetLayout_){
-                vkDestroyDescriptorSetLayout(device_, descriptorSetLayout_, nullptr);
+                vkDestroyDescriptorSetLayout(device_->get(), descriptorSetLayout_, nullptr);
                 descriptorSetLayout_ = nullptr;
             }
             
             if(pipelineLayout_){
-		        vkDestroyPipelineLayout(device_, pipelineLayout_, nullptr);
+		        vkDestroyPipelineLayout(device_->get(), pipelineLayout_, nullptr);
                 pipelineLayout_ = nullptr;
             }
 
         }
 
-        void setDevice(VkDevice device, VkPhysicalDevice physicalDevice) {
+        Shader(Shader&&) = delete; //TODO: Declarer un move constructor
+        Shader& operator=(Shader&&) = delete;
+
+        Shader(const Shader&) = delete;
+        Shader& operator=(const Shader&) = delete;
+
+        void setDevice(const Device* device) {
             device_ = device;
-            physicalDevice_ = physicalDevice;
+        }
+
+        void setPushConstant(PushConstantInformations const& pushContant) {
+            VkPushConstantRange newPushConstantRange_;
+            newPushConstantRange_.offset = 0;
+            newPushConstantRange_.size = pushContant.bufferSize;
+            newPushConstantRange_.stageFlags = pushContant.flags;
+
+            pushConstantRange_ = newPushConstantRange_;
         }
 
         //Add uniforms to the shader structure and allocate the memory for them
@@ -95,7 +117,7 @@ class Shader {
 
             for (UniformInformations const& uniformInformation : uniformsInformation) {
                 uniformBufferWrappers_.emplace_back(nbFrames_, uniformInformation);
-                uniformBufferWrappers_.back().allocate(device_, physicalDevice_);
+                uniformBufferWrappers_.back().allocate(device_->getAllocator(), device_->getPhysical());
             }
 
             nbUniforms_ += uniformsInformation.size();
@@ -105,12 +127,15 @@ class Shader {
         void addTexture(VkCommandPool commandPool, VkQueue queue, std::vector<uint8_t> const& texture, Texture::TextureInformations const& textureInformations) {
 
             textures_.emplace_back(
-                device_, physicalDevice_, commandPool, queue,
+                device_, commandPool, queue,
                 texture, textureInformations
             );
             
         }
 
+        void addTexture(Texture&& texture) {
+            textures_.emplace_back(std::move(texture));
+        }
 
         void generateBindingsAndSets() {
             createDescriptorSetLayout();
@@ -160,7 +185,7 @@ class Shader {
             layoutInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size());
             layoutInfo.pBindings = layoutBindings.data();
 
-            if (vkCreateDescriptorSetLayout(device_, &layoutInfo, nullptr, &descriptorSetLayout_) != VK_SUCCESS) {
+            if (vkCreateDescriptorSetLayout(device_->get(), &layoutInfo, nullptr, &descriptorSetLayout_) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to create a descriptor set !");
             }
 
@@ -172,10 +197,17 @@ class Shader {
             pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             pipelineLayoutInfo.setLayoutCount = 1;
             pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
-            pipelineLayoutInfo.pushConstantRangeCount = 0;    // Optional
-            pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
 
-            if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
+            if (pushConstantRange_) {
+                pipelineLayoutInfo.pushConstantRangeCount = 1;    // Optional
+                pipelineLayoutInfo.pPushConstantRanges = &(*pushConstantRange_); // Optional
+            }
+            else {
+                pipelineLayoutInfo.pushConstantRangeCount = 0;    // Optional
+                pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
+            }
+
+            if (vkCreatePipelineLayout(device_->get(), &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to create the pipeline layout !");
             }
         }
@@ -183,12 +215,19 @@ class Shader {
         //GPU
         void createDescriptorPool() {
 
-            std::array<VkDescriptorPoolSize, 2> poolSizes{};
-            poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            poolSizes[0].descriptorCount = static_cast<uint32_t>(nbUniforms_ * nbFrames_);
+            std::vector<VkDescriptorPoolSize> poolSizes;
+            if (nbUniforms_ > 0) {
+                poolSizes.emplace_back();
+                poolSizes.back().type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                poolSizes.back().descriptorCount = static_cast<uint32_t>(nbUniforms_ * nbFrames_);
+            }
+
+            if (!textures_.empty()) {
+                poolSizes.emplace_back();
+                poolSizes.back().type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                poolSizes.back().descriptorCount = static_cast<uint32_t>(textures_.size() * nbFrames_);
+            }
             
-            poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            poolSizes[1].descriptorCount = static_cast<uint32_t>(textures_.size() * nbFrames_);
 
             VkDescriptorPoolCreateInfo poolInfo{};
             poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -200,7 +239,7 @@ class Shader {
             //A set is a "set of uniforms" that the shaders will have access to. So here we create 1 set for each frame.
             poolInfo.maxSets = static_cast<uint32_t>(nbFrames_);
 
-            if (vkCreateDescriptorPool(device_, &poolInfo, nullptr, &descriptorPool_) != VK_SUCCESS) {
+            if (vkCreateDescriptorPool(device_->get(), &poolInfo, nullptr, &descriptorPool_) != VK_SUCCESS) {
                 throw std::runtime_error("failed to create descriptor pool !");
             }
 
@@ -217,7 +256,7 @@ class Shader {
             allocInfo.pSetLayouts = layouts.data();
 
             descriptorSets_.resize(nbFrames_);
-            if (vkAllocateDescriptorSets(device_, &allocInfo, descriptorSets_.data()) != VK_SUCCESS) {
+            if (vkAllocateDescriptorSets(device_->get(), &allocInfo, descriptorSets_.data()) != VK_SUCCESS) {
                 throw std::runtime_error("failed to allocate descriptor sets !");
             }
 
@@ -274,38 +313,55 @@ class Shader {
 
                 }
 
-                vkUpdateDescriptorSets(device_, static_cast<uint32_t>(writeDescriptors.size()), writeDescriptors.data(), 0, nullptr);
+                vkUpdateDescriptorSets(device_->get(), static_cast<uint32_t>(writeDescriptors.size()), writeDescriptors.data(), 0, nullptr);
 
             }
 
         }
         /// <-
 
+        inline void recordPushConstant(VkCommandBuffer commandBuffer, void * data, uint32_t dataSize) {
+            vkCmdPushConstants(commandBuffer, pipelineLayout_, pushConstantRange_->stageFlags, 0, dataSize, data);
+        }
+
         inline void bind(VkCommandBuffer commandBuffer, uint32_t frameIndex) const {
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_, 0, 1, &descriptorSets_[frameIndex], 0, nullptr);
         }
 
-        inline void updateUniform(size_t uniformIndex, uint32_t imageIndex, void * date, size_t dataSize) const {
-		    memcpy(uniformBufferWrappers_[uniformIndex].uniformBuffersMapped[imageIndex], date, dataSize);
+        inline void updateUniform(size_t uniformIndex, uint32_t frameIndex, void * data, size_t dataSize) const {
+		    memcpy(uniformBufferWrappers_[uniformIndex].uniformBuffersMapped[frameIndex], data, dataSize);
         }
 
-        inline VkPipelineLayout getPipelineLayout() {
+        inline VkPipelineLayout getPipelineLayout() const {
             return pipelineLayout_;
+        }
+
+        inline std::string const& getVertexFilename() const {
+            return vertexFilename_;
+        }
+
+        inline std::string const& getFragmentFilename() const {
+            return fragmentFilename_;
         }
 
     private:
 
         //Vulkan objects
-        VkDevice device_;
-        VkPhysicalDevice physicalDevice_;
+        const Device* device_;
 
         //Vulkan uniforms objects
-        VkDescriptorSetLayout descriptorSetLayout_;
-        VkDescriptorPool descriptorPool_;
+        VkDescriptorSetLayout descriptorSetLayout_ = nullptr;
+        VkDescriptorPool descriptorPool_ = nullptr;
         std::vector<VkDescriptorSet> descriptorSets_;
-        VkPipelineLayout pipelineLayout_;
+        VkPipelineLayout pipelineLayout_ = nullptr;
 
+        //Shader variables
         uint16_t nbFrames_;
+        std::string vertexFilename_;
+        std::string fragmentFilename_;
+
+        //Push constant memory
+        std::optional<VkPushConstantRange> pushConstantRange_;
 
         //Uniforms memory
         std::vector<UniformBufferWrapper> uniformBufferWrappers_;
@@ -313,4 +369,5 @@ class Shader {
 
         //Texture memory
         std::vector<Texture> textures_;
+
 };

@@ -20,6 +20,7 @@ if ( MSVC )
     
     target_link_libraries(app PRIVATE glfw3)
     target_link_libraries(app PRIVATE ${Vulkan_LIBRARIES})
+    target_link_libraries(app PRIVATE VulkanMemoryAllocator)
 
 
 elseif ( APPLE )

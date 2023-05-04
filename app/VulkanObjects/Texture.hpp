@@ -2,8 +2,11 @@
 
 #include <vulkan/vulkan.h>
 
+#include <VulkanObjects/Device.hpp>
 #include <VulkanObjects/Helper/Buffer.hpp>
 #include <VulkanObjects/Helper/Image.hpp>
+
+#include <vk_mem_alloc.h>
 
 #include <vector>
 
@@ -19,60 +22,77 @@ class Texture {
             VkShaderStageFlags flags;
         };
 
-        Texture(VkDevice device, VkPhysicalDevice physicalDevice, VkCommandPool commandPool, VkQueue queue,
+        Texture(const Device* device, VkCommandPool commandPool, VkQueue queue,
             std::vector<uint8_t> const& data, TextureInformations const& textureInformations)
             : device_(device), size_(data.size()), textureInformations_(textureInformations) {
             
-            createTextureBuffers(physicalDevice, commandPool, queue, data);
-            textureImageView_= Image::createImageView(device_, textureImage_, VK_FORMAT_R8G8B8A8_SRGB);
+            createTextureBuffers(commandPool, queue, data);
+            textureImageView_= Image::createImageView(device_->get(), textureImage_, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
             createTextureSampler();
         }
+        
+
+        Texture(Texture&& movedTexture) :
+            size_(std::move(movedTexture.size_)),
+            textureInformations_(std::move(movedTexture.textureInformations_)),
+            device_(std::move(movedTexture.device_)),
+            textureImage_(std::move(movedTexture.textureImage_)),
+            textureImageAllocation_(std::move(movedTexture.textureImageAllocation_)),
+            textureImageView_(std::move(movedTexture.textureImageView_)),
+            textureSampler_(std::move(movedTexture.textureSampler_))
+        {
+            movedTexture.textureImage_ = nullptr;
+            movedTexture.textureImageAllocation_ = nullptr;
+            movedTexture.textureImageView_ = nullptr;
+            movedTexture.textureSampler_ = nullptr;
+        }
+
+        Texture& operator=(Texture&& movedTexture) = delete;
+
+        Texture(const Texture&) = delete;
+        Texture& operator=(const Texture&) = delete;
+
 
         ~Texture() {
             if(textureSampler_) {
-                vkDestroySampler(device_, textureSampler_, nullptr);
+                vkDestroySampler(device_->get(), textureSampler_, nullptr);
                 textureSampler_ = nullptr;
             }
             if (textureImageView_) {
-                vkDestroyImageView(device_, textureImageView_, nullptr);
+                vkDestroyImageView(device_->get(), textureImageView_, nullptr);
                 textureImageView_ = nullptr;
             }
             if (textureImage_) {
-                vkDestroyImage(device_, textureImage_, nullptr);
+                vmaDestroyImage(device_->getAllocator(), textureImage_, textureImageAllocation_);
+                textureImageAllocation_ = nullptr;
                 textureImage_ = nullptr;
             }
-            if (textureImageMemory_) {
-                vkFreeMemory(device_, textureImageMemory_, nullptr);
-                textureImageMemory_ = nullptr;
-            }
+
+
         }
 
-        void createTextureBuffers(VkPhysicalDevice physicalDevice, VkCommandPool commandPool, VkQueue queue, std::vector<uint8_t> const& data) {
+        void createTextureBuffers(VkCommandPool commandPool, VkQueue queue, std::vector<uint8_t> const& data) {
             
             VkBuffer stagingBuffer;
-            VkDeviceMemory stagingBufferMemory;
+            VmaAllocation stagingBufferAllocation;
+            VmaAllocationInfo bufferAllocInfo;
 
-            Buffer::create(device_, physicalDevice, size_, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+            Buffer::create(device_->getAllocator(), size_, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT, stagingBuffer, stagingBufferAllocation, &bufferAllocInfo);
 
-            void* mappedMemory;
-            vkMapMemory(device_, stagingBufferMemory, 0, size_, 0, &mappedMemory);
-            memcpy(mappedMemory, data.data(), static_cast<size_t>(size_));
-            vkUnmapMemory(device_, stagingBufferMemory);
-
-            Buffer::createImage(device_, physicalDevice, textureInformations_.width, textureInformations_.height, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage_, textureImageMemory_); 
+            memcpy(bufferAllocInfo.pMappedData, data.data(), static_cast<size_t>(size_));
+    
+            Buffer::createImage(device_->getAllocator(), textureInformations_.width, textureInformations_.height, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 0, textureImage_, textureImageAllocation_); 
 
             // Change the organisation of the image to optimize the data reception
-            Image::transitionImageLayout(device_, commandPool, queue, textureImage_, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            Image::transitionImageLayout(device_->get(), commandPool, queue, textureImage_, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
             // Copy the buffer into the image
-            Buffer::copyToImage(device_, commandPool, queue, stagingBuffer, textureImage_, textureInformations_.width, textureInformations_.height);
+            Buffer::copyToImage(device_->get(), commandPool, queue, stagingBuffer, textureImage_, textureInformations_.width, textureInformations_.height);
 
             // Then change again the organisation of the image after the copy to optimize the read in the shader
-            Image::transitionImageLayout(device_, commandPool, queue, textureImage_, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            Image::transitionImageLayout(device_->get(), commandPool, queue, textureImage_, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-            vkDestroyBuffer(device_, stagingBuffer, nullptr);
-            vkFreeMemory(device_, stagingBufferMemory, nullptr);
-
+            vmaDestroyBuffer(device_->getAllocator(), stagingBuffer, stagingBufferAllocation);
         }
 
         void createTextureSampler() {
@@ -102,7 +122,7 @@ class Texture {
             samplerInfo.minLod = 0.0f;
             samplerInfo.maxLod = 0.0f;
 
-            if (vkCreateSampler(device_, &samplerInfo, nullptr, &textureSampler_) != VK_SUCCESS) {
+            if (vkCreateSampler(device_->get(), &samplerInfo, nullptr, &textureSampler_) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to create sampler !");
             }
 
@@ -126,12 +146,12 @@ class Texture {
         TextureInformations textureInformations_;
         
         //Saved vulkan objects
-        VkDevice device_;
+        const Device* device_;
         // VkCommandPool commandPool_;
         // VkQueue queue_;
 
         VkImage textureImage_;
-        VkDeviceMemory textureImageMemory_;
+        VmaAllocation textureImageAllocation_;
         VkImageView textureImageView_;
         VkSampler textureSampler_;
 

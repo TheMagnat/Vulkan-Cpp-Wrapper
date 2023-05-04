@@ -1,6 +1,9 @@
 
+#pragma once
+
 #include <vulkan/vulkan.h>
 
+#include <VulkanObjects/Device.hpp>
 #include <VulkanObjects/Helper/Buffer.hpp>
 
 #include <glm/vec2.hpp>
@@ -12,39 +15,33 @@
 
 struct VertexData {
 
-    VertexData(VkDevice device, VkPhysicalDevice physicalDevice, std::vector<uint32_t> const& attributesSize)
-        : device_(device), physicalDevice_(physicalDevice), attributesSize_(attributesSize)
-    {
-        totalSize_ = std::reduce(attributesSize_.begin(), attributesSize_.end());
-        generateBindingDescription();
-        generateAttributeDescriptions();
-    }
+    VertexData(const Device* device, VkCommandPool commandPool)
+        : device_(device), commandPool_(commandPool) {}
 
     ~VertexData() {
+        
         if (vertexBuffer_) {
-            vkDestroyBuffer(device_, vertexBuffer_, nullptr);
+            vmaDestroyBuffer(device_->getAllocator(), vertexBuffer_, vertexBufferAllocation_);
             vertexBuffer_ = nullptr;
-        }
-
-		if (vertexBufferMemory_) {
-            vkFreeMemory(device_, vertexBufferMemory_, nullptr);
-            vertexBufferMemory_ = nullptr;
+            vertexBufferAllocation_ = nullptr;
         }
 
         if (indexBuffer_) {
-            vkDestroyBuffer(device_, indexBuffer_, nullptr);
+            vmaDestroyBuffer(device_->getAllocator(), indexBuffer_, indexBufferAllocation_);
             indexBuffer_ = nullptr;
+            indexBufferAllocation_ = nullptr;
         }
 
-		if (indexBufferMemory_) {
-            vkFreeMemory(device_, indexBufferMemory_, nullptr);
-            indexBufferMemory_ = nullptr;
-        }
     }
 
-    void setDevice(VkDevice device, VkPhysicalDevice physicalDevice) {
+    VertexData(VertexData&&) = delete; //TODO: Declarer un move constructor
+    VertexData& operator=(VertexData&&) = delete;
+
+    VertexData(const VertexData&) = delete;
+    VertexData& operator=(const VertexData&) = delete;
+
+    void setDevice(const Device* device) {
         device_ = device;
-        physicalDevice_ = physicalDevice;
     }
 
     void bind(VkCommandBuffer commandBuffer) const {
@@ -59,7 +56,7 @@ struct VertexData {
 		vkCmdDrawIndexed(commandBuffer, indicesSize_, 1, 0, 0, 0);
     }
 
-    VkResult setData(std::vector<float> const& vertices, std::vector<uint32_t> const& indices, VkCommandPool commandPool, VkQueue queue) {
+    VkResult setData(std::vector<float> const& vertices, std::vector<uint32_t> const& indices) {
 
         void* data;
 
@@ -67,38 +64,43 @@ struct VertexData {
         VkDeviceSize vertexBufferSize = sizeof(float) * vertices.size();
 
 		VkBuffer stagingVertexBuffer;
-		VkDeviceMemory stagingVertexBufferMemory;
-		Buffer::create(device_, physicalDevice_, vertexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingVertexBuffer, stagingVertexBufferMemory);
+		VmaAllocation stagingVertexBufferAllocation;
+		VmaAllocationInfo stagingVertexBufferAllocationInfo;
 
-		vkMapMemory(device_, stagingVertexBufferMemory, 0, vertexBufferSize, 0, &data);
-		memcpy(data, vertices.data(), (size_t) vertexBufferSize);
+		Buffer::create(device_->getAllocator(), vertexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT, stagingVertexBuffer, stagingVertexBufferAllocation, &stagingVertexBufferAllocationInfo);
 
-		vkUnmapMemory(device_, stagingVertexBufferMemory);
+		// vkMapMemory(device_->get(), stagingVertexBufferMemory, 0, vertexBufferSize, 0, &data);
+		memcpy(stagingVertexBufferAllocationInfo.pMappedData, vertices.data(), (size_t) vertexBufferSize);
+		// vkUnmapMemory(device_->get(), stagingVertexBufferMemory);
 
-		Buffer::create(device_, physicalDevice_, vertexBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer_, vertexBufferMemory_);
+		Buffer::create(device_->getAllocator(), vertexBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 0, vertexBuffer_, vertexBufferAllocation_, nullptr);
 
-		Buffer::copy(device_, commandPool, queue, stagingVertexBuffer, vertexBuffer_, vertexBufferSize);
+		Buffer::copy(device_->get(), commandPool_, device_->getGraphicsQueue(), stagingVertexBuffer, vertexBuffer_, vertexBufferSize);
 
-		vkDestroyBuffer(device_, stagingVertexBuffer, nullptr);
-		vkFreeMemory(device_, stagingVertexBufferMemory, nullptr);
+		// vkDestroyBuffer(device_->get(), stagingVertexBuffer, nullptr);
+		// vkFreeMemory(device_->get(), stagingVertexBufferMemory, nullptr);
+        vmaDestroyBuffer(device_->getAllocator(), stagingVertexBuffer, stagingVertexBufferAllocation);
 
         //// Create index buffer
         VkDeviceSize indexBufferSize = sizeof(uint32_t) * indices.size();
 
         VkBuffer stagingIndexBuffer;
-        VkDeviceMemory stagingIndexBufferMemory;
-        Buffer::create(device_, physicalDevice_, indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingIndexBuffer, stagingIndexBufferMemory);
+        VmaAllocation stagingIndexBufferAllocation;
+        VmaAllocationInfo stagingIndexBufferAllocationInfo;
 
-        vkMapMemory(device_, stagingIndexBufferMemory, 0, indexBufferSize, 0, &data);
-        memcpy(data, indices.data(), (size_t) indexBufferSize);
-        vkUnmapMemory(device_, stagingIndexBufferMemory);
+        Buffer::create(device_->getAllocator(), indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT, stagingIndexBuffer, stagingIndexBufferAllocation, &stagingIndexBufferAllocationInfo);
 
-        Buffer::create(device_, physicalDevice_, indexBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer_, indexBufferMemory_);
+        // vkMapMemory(device_->get(), stagingIndexBufferMemory, 0, indexBufferSize, 0, &data);
+        memcpy(stagingIndexBufferAllocationInfo.pMappedData, indices.data(), (size_t) indexBufferSize);
+        // vkUnmapMemory(device_->get(), stagingIndexBufferMemory);
 
-        Buffer::copy(device_, commandPool, queue, stagingIndexBuffer, indexBuffer_, indexBufferSize);
+        Buffer::create(device_->getAllocator(), indexBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 0, indexBuffer_, indexBufferAllocation_, nullptr);
 
-        vkDestroyBuffer(device_, stagingIndexBuffer, nullptr);
-        vkFreeMemory(device_, stagingIndexBufferMemory, nullptr);
+        Buffer::copy(device_->get(), commandPool_, device_->getGraphicsQueue(), stagingIndexBuffer, indexBuffer_, indexBufferSize);
+
+        // vkDestroyBuffer(device_->get(), stagingIndexBuffer, nullptr);
+        // vkFreeMemory(device_->get(), stagingIndexBufferMemory, nullptr);
+        vmaDestroyBuffer(device_->getAllocator(), stagingIndexBuffer, stagingIndexBufferAllocation);
 
         indicesSize_ = indices.size();
 
@@ -106,64 +108,64 @@ struct VertexData {
 
     }
     
-    VkVertexInputBindingDescription const& getBindingDescription() const {
-        return bindingDescription_;
-    }
 
-    std::vector<VkVertexInputAttributeDescription> const& getAttributeDescriptions() const {
-        return attributeDescriptions_;
-    }
+    static std::pair<VkVertexInputBindingDescription, std::vector<VkVertexInputAttributeDescription>> getDescriptions(std::vector<uint32_t> const& attributesSize) {
 
-    void generateBindingDescription() {
-        
-        bindingDescription_.binding = 0;
-        bindingDescription_.stride = sizeof(float) * totalSize_;
-        bindingDescription_.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        return { generateBindingDescription(attributesSize), generateAttributeDescriptions(attributesSize) };
 
     }
 
-    void generateAttributeDescriptions() {
+    static VkVertexInputBindingDescription generateBindingDescription(std::vector<uint32_t> const& attributesSize) {
+        VkVertexInputBindingDescription bindingDescription;
 
-        attributeDescriptions_.resize( attributesSize_.size() );
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(float) * std::reduce(attributesSize.begin(), attributesSize.end());
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-        for (uint32_t i = 0, acc = 0; i < attributeDescriptions_.size(); ++i) {
+        return bindingDescription;
+    }
+
+    static std::vector<VkVertexInputAttributeDescription> generateAttributeDescriptions(std::vector<uint32_t> const& attributesSize) {
+
+        std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
+
+        attributeDescriptions.resize( attributesSize.size() );
+
+        for (uint32_t i = 0, acc = 0; i < attributeDescriptions.size(); ++i) {
             
-            uint32_t numberOfFloat = attributesSize_[i];
+            uint32_t numberOfFloat = attributesSize[i];
 
-            attributeDescriptions_[i].binding = 0;
-            attributeDescriptions_[i].location = i;
+            attributeDescriptions[i].binding = 0;
+            attributeDescriptions[i].location = i;
 
-            if      (numberOfFloat == 1) attributeDescriptions_[i].format = VK_FORMAT_R32_SFLOAT;
-            else if (numberOfFloat == 2) attributeDescriptions_[i].format = VK_FORMAT_R32G32_SFLOAT;
-            else if (numberOfFloat == 3) attributeDescriptions_[i].format = VK_FORMAT_R32G32B32_SFLOAT;
-            else if (numberOfFloat == 4) attributeDescriptions_[i].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+            if      (numberOfFloat == 1) attributeDescriptions[i].format = VK_FORMAT_R32_SFLOAT;
+            else if (numberOfFloat == 2) attributeDescriptions[i].format = VK_FORMAT_R32G32_SFLOAT;
+            else if (numberOfFloat == 3) attributeDescriptions[i].format = VK_FORMAT_R32G32B32_SFLOAT;
+            else if (numberOfFloat == 4) attributeDescriptions[i].format = VK_FORMAT_R32G32B32A32_SFLOAT;
             else throw std::runtime_error("One of the attributes size is not legal !");
             
-            attributeDescriptions_[i].offset = acc * sizeof(float);
+            attributeDescriptions[i].offset = acc * sizeof(float);
 
             acc += numberOfFloat;
 
         }
 
+        return attributeDescriptions;
+
     }
 
     private:
 
-        VkDevice device_;
-        VkPhysicalDevice physicalDevice_;
+        //Vulkan objects save
+        const Device* device_;
+        VkCommandPool commandPool_;
 
         VkBuffer vertexBuffer_ = nullptr;
-        VkDeviceMemory vertexBufferMemory_ = nullptr;
+        VmaAllocation vertexBufferAllocation_ = nullptr;
 
         VkBuffer indexBuffer_ = nullptr;
-        VkDeviceMemory indexBufferMemory_ = nullptr;
+        VmaAllocation indexBufferAllocation_ = nullptr;
 
-
-        std::vector<uint32_t> attributesSize_;
-        uint32_t totalSize_;
         uint32_t indicesSize_ = 0;
-
-        VkVertexInputBindingDescription bindingDescription_;
-        std::vector<VkVertexInputAttributeDescription> attributeDescriptions_;
 
 };
